@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Hack Your Attendance</title>
+    <link rel="stylesheet" href="/static/style.css" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600;700&family=Share+Tech+Mono&display=swap" rel="stylesheet" />
+</head>
+<body>
+
+<!-- matrix rain canvas -->
+<canvas id="matrixCanvas"></canvas>
+
+<!-- scanline overlay -->
+<div class="scanlines"></div>
+
+<!-- CRT vignette -->
+<div class="vignette"></div>
+
+<main class="container">
+    <!-- ───── TERMINAL HEADER ───── -->
+    <header class="terminal-header glitch-in">
+        <div class="terminal-bar">
+            <span class="terminal-dot red"></span>
+            <span class="terminal-dot yellow"></span>
+            <span class="terminal-dot green"></span>
+            <span class="terminal-title">root@attendance:~#</span>
+        </div>
+        <div class="header-content">
+            <div class="ascii-badge">&gt;_ SYSTEM ONLINE</div>
+            <h1 class="title glitch" data-text="ATTENDANCE_SYS">ATTENDANCE_SYS</h1>
+            <p class="subtitle typing-text">
+                <span class="prompt">&gt;</span> Initializing attendance breach protocol...
+            </p>
+        </div>
+    </header>
+
+    <!-- ───── INPUT CARD ───── -->
+    <div class="card cyber-card glitch-in delay-1">
+        <div class="card-corner tl"></div>
+        <div class="card-corner tr"></div>
+        <div class="card-corner bl"></div>
+        <div class="card-corner br"></div>
+
+        <div class="card-header">
+            <span class="blink-cursor">&gt;</span> INPUT_DATA <span class="tag">[CLASSIFIED]</span>
+        </div>
+
+        <form id="attendanceForm" autocomplete="off">
+            <div class="form-grid">
+                <!-- Total lectures -->
+                <div class="input-group">
+                    <div class="input-prefix">01</div>
+                    <input type="number" id="total" min="1" required placeholder=" " />
+                    <label for="total">total_lectures</label>
+                    <div class="input-line"></div>
+                </div>
+
+                <!-- Attended lectures -->
+                <div class="input-group">
+                    <div class="input-prefix">02</div>
+                    <input type="number" id="attended" min="0" required placeholder=" " />
+                    <label for="attended">lectures_attended</label>
+                    <div class="input-line"></div>
+                </div>
+
+                <!-- No-attendance classes -->
+                <div class="input-group">
+                    <div class="input-prefix">03</div>
+                    <input type="number" id="noAttendance" min="0" value="0" required placeholder=" " />
+                    <label for="noAttendance">no_attendance</label>
+                    <div class="input-line"></div>
+                </div>
+
+                <!-- Required % -->
+                <div class="input-group">
+                    <div class="input-prefix">04</div>
+                    <input type="number" id="required" min="1" max="100" value="75" required placeholder=" " />
+                    <label for="required">required_pct</label>
+                    <div class="input-line"></div>
+                </div>
+            </div>
+
+            <button type="submit" class="btn" id="calcBtn">
+                <span class="btn-text">
+                    <span class="btn-bracket">[</span>
+                    EXECUTE_SCAN
+                    <span class="btn-bracket">]</span>
+                </span>
+                <span class="btn-loader">
+                    <span class="loader-bar"></span>
+                </span>
+            </button>
+        </form>
+    </div>
+
+    <!-- ───── RESULT CARD ───── -->
+    <div class="result-card hidden" id="resultCard">
+        <div class="card-corner tl"></div>
+        <div class="card-corner tr"></div>
+        <div class="card-corner bl"></div>
+        <div class="card-corner br"></div>
+
+        <!-- status badge -->
+        <div class="status-line" id="statusLine">
+            <span class="status-indicator"></span>
+            <span class="status-text" id="statusText">SCANNING...</span>
+        </div>
+
+        <!-- circular meter -->
+        <div class="meter-wrapper">
+            <svg class="meter" viewBox="0 0 200 200">
+                <defs>
+                    <linearGradient id="gNeon" x1="0%" y1="0%" x2="100%" y2="100%">
+                        <stop offset="0%" stop-color="#00ff41"/>
+                        <stop offset="100%" stop-color="#00d4ff"/>
+                    </linearGradient>
+                    <linearGradient id="gAlert" x1="0%" y1="0%" x2="100%" y2="100%">
+                        <stop offset="0%" stop-color="#ff0040"/>
+                        <stop offset="100%" stop-color="#ff6600"/>
+                    </linearGradient>
+                </defs>
+                <circle class="meter-track" cx="100" cy="100" r="85"></circle>
+                <circle class="meter-fill" cx="100" cy="100" r="85" id="meterFill"></circle>
+                <!-- tick marks -->
+                <g class="meter-ticks" id="meterTicks"></g>
+            </svg>
+            <div class="meter-inner">
+                <div class="meter-value" id="meterValue">0.00%</div>
+                <div class="meter-label">SCAN_RESULT</div>
+            </div>
+        </div>
+
+        <!-- stat grid -->
+        <div class="stats-grid" id="stats"></div>
+
+        <!-- message terminal -->
+        <div class="message-terminal" id="messageBox"></div>
+
+        <!-- action number -->
+        <div class="action-block hidden" id="actionBlock">
+            <div class="action-number" id="actionNumber">0</div>
+            <div class="action-label" id="actionLabel">LECTURES</div>
+        </div>
+    </div>
+</main>
+
+<!-- footer -->
+<footer class="footer glitch-in delay-3">
+    <span class="prompt">&gt;</span> connection_secure // <span class="neon-text">attendance.py</span> loaded
+    <span class="blink-cursor">█</span>
+</footer>
+
+<script>
+/* ══════════ MATRIX RAIN ══════════ */
+(function matrixRain() {
+    const c = document.getElementById("matrixCanvas");
+    const ctx = c.getContext("2d");
+    let w, h, cols, drops;
+    const chars = "アイウエオカキクケコサシスセソタチツテトナニヌネノハヒフヘホマミムメモヤユヨラリルレロワヲン0123456789ABCDEF{}[]<>/\\|";
+
+    function resize() {
+        w = c.width  = window.innerWidth;
+        h = c.height = window.innerHeight;
+        cols = Math.floor(w / 18);
+        drops = Array(cols).fill(1);
+    }
+    resize();
+    window.addEventListener("resize", resize);
+
+    function draw() {
+        ctx.fillStyle = "rgba(0, 0, 0, 0.06)";
+        ctx.fillRect(0, 0, w, h);
+        ctx.fillStyle = "#00ff4130";
+        ctx.font = "15px 'Fira Code', monospace";
+
+        for (let i = 0; i < cols; i++) {
+            const ch = chars[Math.floor(Math.random() * chars.length)];
+            ctx.fillText(ch, i * 18, drops[i] * 18);
+            if (drops[i] * 18 > h && Math.random() > 0.975) drops[i] = 0;
+            drops[i]++;
+        }
+        requestAnimationFrame(draw);
+    }
+    draw();
+})();
+
+/* ══════════ TYPEWRITER subtitle ══════════ */
+(function typewriter() {
+    const el = document.querySelector(".typing-text");
+    if (!el) return;
+    const full = el.textContent;
+    el.textContent = "";
+    let i = 0;
+    function tick() {
+        if (i <= full.length) {
+            el.textContent = full.slice(0, i) + "█";
+            i++;
+            setTimeout(tick, 35 + Math.random() * 40);
+        } else {
+            el.textContent = full;
+        }
+    }
+    setTimeout(tick, 800);
+})();
+
+/* ══════════ FORM SUBMIT ══════════ */
+document.getElementById("attendanceForm").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const btn = document.getElementById("calcBtn");
+    btn.classList.add("loading");
+
+    const total         = document.getElementById("total").value;
+    const attended      = document.getElementById("attended").value;
+    const no_attendance = document.getElementById("noAttendance").value;
+    const required      = document.getElementById("required").value;
+
+    try {
+        const res = await fetch("/calculate", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ total, attended, no_attendance, required }),
+        });
+        const data = await res.json();
+        btn.classList.remove("loading");
+        if (data.error) { showError(data.error); return; }
+        showResult(data);
+    } catch (err) {
+        btn.classList.remove("loading");
+        showError("ERROR: Connection to server lost.");
+    }
+});
+
+/* ══════════ RENDER RESULT ══════════ */
+function showResult(data) {
+    const card = document.getElementById("resultCard");
+    card.classList.remove("hidden", "theme-pass", "theme-fail");
+    card.classList.add(data.eligible ? "theme-pass" : "theme-fail");
+
+    // status line
+    const sl = document.getElementById("statusLine");
+    sl.className = "status-line " + (data.eligible ? "sl-pass" : "sl-fail");
+    document.getElementById("statusText").textContent =
+        data.eligible ? "ACCESS GRANTED — ELIGIBLE" : "ACCESS DENIED — NOT ELIGIBLE";
+
+    // meter
+    animateMeter(data.percentage, data.eligible);
+
+    // stat grid
+    document.getElementById("stats").innerHTML = `
+        <div class="stat-cell pop-in" style="--d:0"><span class="stat-val">${data.total}</span><span class="stat-key">TOTAL</span></div>
+        <div class="stat-cell pop-in" style="--d:1"><span class="stat-val">${data.effective_total}</span><span class="stat-key">EFFECTIVE</span></div>
+        <div class="stat-cell pop-in" style="--d:2"><span class="stat-val">${data.attended}</span><span class="stat-key">ATTENDED</span></div>
+        <div class="stat-cell pop-in" style="--d:3"><span class="stat-val">${data.required}%</span><span class="stat-key">REQUIRED</span></div>
+    `;
+
+    // message terminal
+    const mb = document.getElementById("messageBox");
+    mb.className = "message-terminal " + (data.eligible ? "mt-pass" : "mt-fail");
+    mb.innerHTML = `<span class="prompt">&gt;</span> ${data.message}`;
+
+    // action block
+    const ab = document.getElementById("actionBlock");
+    const numEl = document.getElementById("actionNumber");
+    const lblEl = document.getElementById("actionLabel");
+
+    if (data.eligible && data.bunkable !== undefined) {
+        ab.classList.remove("hidden");
+        ab.className = "action-block action-pass";
+        lblEl.textContent = "BUNKABLE LECTURES 😎";
+        animateCounter(numEl, data.bunkable);
+    } else if (!data.eligible && data.needed !== undefined && data.needed >= 0) {
+        ab.classList.remove("hidden");
+        ab.className = "action-block action-fail";
+        lblEl.textContent = "LECTURES TO RECOVER 📈";
+        animateCounter(numEl, data.needed);
+    } else {
+        ab.classList.add("hidden");
+    }
+
+    card.scrollIntoView({ behavior: "smooth", block: "center" });
+}
+
+/* ══════════ ANIMATED COUNTER ══════════ */
+function animateCounter(el, target) {
+    const dur = 1000;
+    const start = performance.now();
+    function tick(now) {
+        const p = Math.min((now - start) / dur, 1);
+        const ease = 1 - Math.pow(1 - p, 3);
+        el.textContent = Math.round(ease * target);
+        if (p < 1) requestAnimationFrame(tick);
+    }
+    requestAnimationFrame(tick);
+}
+
+/* ══════════ ANIMATED METER ══════════ */
+function animateMeter(pct, eligible) {
+    const circle = document.getElementById("meterFill");
+    const valEl  = document.getElementById("meterValue");
+    const radius = 85;
+    const circ   = 2 * Math.PI * radius;
+    circle.style.strokeDasharray  = circ;
+    circle.style.strokeDashoffset = circ;
+    circle.style.stroke = eligible ? "url(#gNeon)" : "url(#gAlert)";
+    valEl.style.color   = eligible ? "#00ff41" : "#ff0040";
+
+    const target = Math.min(pct, 100);
+    const dur = 1500;
+    const start = performance.now();
+
+    function tick(now) {
+        const p = Math.min((now - start) / dur, 1);
+        const ease = 1 - Math.pow(1 - p, 4);
+        const cur = ease * target;
+        circle.style.strokeDashoffset = circ - (cur / 100) * circ;
+        valEl.textContent = cur.toFixed(1) + "%";
+        if (p < 1) requestAnimationFrame(tick);
+        else valEl.textContent = pct.toFixed(2) + "%";
+    }
+    requestAnimationFrame(tick);
+}
+
+/* ══════════ ERROR ══════════ */
+function showError(msg) {
+    const card = document.getElementById("resultCard");
+    card.classList.remove("hidden", "theme-pass", "theme-fail");
+    card.classList.add("theme-fail");
+
+    document.getElementById("statusLine").className = "status-line sl-fail";
+    document.getElementById("statusText").textContent = "SYSTEM ERROR";
+    document.getElementById("meterFill").style.strokeDashoffset = 2 * Math.PI * 85;
+    document.getElementById("meterValue").textContent = "ERR";
+    document.getElementById("meterValue").style.color = "#ff0040";
+    document.getElementById("stats").innerHTML = "";
+    document.getElementById("messageBox").className = "message-terminal mt-fail";
+    document.getElementById("messageBox").innerHTML = `<span class="prompt">&gt;</span> ${msg}`;
+    document.getElementById("actionBlock").classList.add("hidden");
+    card.scrollIntoView({ behavior: "smooth", block: "center" });
+}
+</script>
+</body>
+</html>
